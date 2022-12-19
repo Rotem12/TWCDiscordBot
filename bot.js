@@ -1,5 +1,7 @@
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
 const { token, host, port, server_password } = require('./config.json');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const client = new Client({
 	intents: [
@@ -10,14 +12,27 @@ const client = new Client({
 	],
 });
 
-var messageQueue = [];
+client.commands = new Collection();
 
-client.on('ready', () => 
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) 
+{
+	const filePath = path.join(commandsPath, file);
+	const command = require(filePath);
+	client.commands.set(command.data.name, command);
+}
+
+var messageQueue = [];
+var playerList = "nobody on.";
+
+client.on(Events.ClientReady, () => 
 {
 	console.log(`Logged in as ${client.user.tag}!`);
 });
 
-client.on('messageCreate', msg => 
+client.on(Events.MessageCreate, msg => 
 {
 	if(msg.author.bot) return;
 	
@@ -30,6 +45,24 @@ client.on('messageCreate', msg =>
 	}
 
 	console.log("The current queue is: ", messageQueue);
+});
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const command = interaction.client.commands.get(interaction.commandName);
+
+	if (!command) {
+		console.error(`No command matching ${interaction.commandName} was found.`);
+		return;
+	}
+
+	try {
+		await command.execute(interaction, playerList);
+	} catch (error) {
+		console.error(error);
+		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+	}
 });
 
 client.login(token);
@@ -66,10 +99,15 @@ function checkString(s, charLimit=0)
 	return s
 }
 
+function formatWho(s)
+{
+	return decodeURIComponent(s.replace(/\+/g, ' '))
+}
+
 function respondToRequest (request, response)
 {
 	let res = "";
-	if (!("content-type" in request["headers"]) || request["headers"]["content-type"] != "text/plain" || request.connection.remoteAddress != host)
+	if (!("content-type" in request["headers"]) || request["headers"]["content-type"] != "application/json" || request.connection.remoteAddress != host)
 	{
 		response.writeHead(400, {"Content-Type": "text/plain"}); 
 		response.end("wrong format");
@@ -84,11 +122,25 @@ function respondToRequest (request, response)
 
 	request.on('end', function()
 	{
-		if(body != server_password)
+		let bodyJSON = JSON.parse(body);
+
+		if(bodyJSON["password"] != server_password)
 		{
 			response.writeHead(401, {"Content-Type": "text/plain"}); 
 			response.end("wrong password");
 			return;
+		}
+		
+		if(("players" in bodyJSON))
+		{
+			if(bodyJSON["players"] == "")
+			{
+				bodyJSON["players"] = "nobody on."
+			}
+			else
+			{
+				playerList = formatWho(bodyJSON["players"]);
+			}
 		}
 			
 		if(messageQueue.length > 0)
