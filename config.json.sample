@@ -3,4 +3,6 @@
   "host": "127.0.0.1",
   "port": 8081,
   "server_password": "im not hostile"
+  "clientId": "bot id",
+  "guildId": "sever id"
 }
