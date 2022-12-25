@@ -101,7 +101,10 @@ function checkString(s, charLimit=0)
 
 function formatWho(s)
 {
-	return decodeURIComponent(s.replace(/\+/g, ' '))
+	s = decodeURIComponent(s.replace(/\+/g, ' '));
+	s = s.replace(/<[^>]*>/g, '');
+	
+	return s
 }
 
 function respondToRequest (request, response)
