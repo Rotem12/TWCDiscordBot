@@ -92,6 +92,8 @@ function checkString(s, charLimit=0)
 	s = s.replace(pattern3, '');
 	s = s.replace(pattern4, '');
 	
+	s = JSON.stringify(s).slice(1, -1);
+	
 	if(charLimit > 0)
 	{
 		return s.substring(0, charLimit)
